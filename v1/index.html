@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>注文サポート</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2f6f4f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="注文サポート">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --ink:#1c2024;
+    --paper:#f7f4ec;
+    --card:#ffffff;
+    --line:#e3ddd0;
+    --accent:#2f6f4f;      /* 落ち着いた緑：確定・主動線 */
+    --accent-soft:#e7f0ea;
+    --warn:#b4541f;        /* 自信の低い候補・注意 */
+    --warn-soft:#f7e9df;
+    --muted:#7a756b;
+    --shadow:0 1px 3px rgba(30,30,30,.08),0 6px 20px rgba(30,30,30,.06);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    line-height:1.5;
+  }
+  .wrap{max-width:880px;margin:0 auto;padding:16px 16px 120px;}
+  header.top{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:12px;padding:8px 2px 16px;
+  }
+  .title{font-size:18px;font-weight:700;letter-spacing:.02em;}
+  .title small{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-top:2px;}
+  .menu-edit-btn{
+    background:none;border:1px solid var(--line);border-radius:999px;
+    padding:8px 14px;font-size:13px;color:var(--muted);cursor:pointer;
+  }
+  .menu-edit-btn:active{background:#eee;}
+
+  /* 復唱カード：画面の主役 */
+  .echo{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:20px;margin-bottom:14px;
+  }
+  .echo .label{
+    font-size:12px;color:var(--accent);font-weight:700;letter-spacing:.08em;
+    display:flex;align-items:center;gap:6px;margin-bottom:8px;
+  }
+  .echo .label::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .echo .sentence{
+    font-size:26px;font-weight:700;line-height:1.45;letter-spacing:.01em;
+    word-break:break-word;
+  }
+  .echo .sentence.empty{font-size:17px;font-weight:500;color:var(--muted);}
+
+  /* 音声バー */
+  .mic-row{display:flex;gap:10px;align-items:stretch;margin-bottom:16px;}
+  .mic-btn{
+    flex:1;display:flex;align-items:center;justify-content:center;gap:10px;
+    border:none;border-radius:var(--radius);padding:16px;cursor:pointer;
+    font-size:17px;font-weight:700;color:#fff;background:var(--accent);
+    box-shadow:var(--shadow);transition:transform .05s;
+  }
+  .mic-btn:active{transform:scale(.99);}
+  .mic-btn.listening{background:var(--warn);}
+  .mic-dot{width:12px;height:12px;border-radius:50%;background:#fff;opacity:.9;}
+  .mic-btn.listening .mic-dot{animation:pulse 1s infinite;}
+  @keyframes pulse{0%,100%{opacity:.3;transform:scale(.8);}50%{opacity:1;transform:scale(1.3);}}
+  .heard{
+    flex:1.4;background:var(--card);border:1px dashed var(--line);border-radius:var(--radius);
+    padding:12px 14px;font-size:14px;color:var(--muted);display:flex;align-items:center;
+    min-height:54px;word-break:break-word;
+  }
+  .heard.has{color:var(--ink);}
+
+  /* 注文リスト */
+  .order-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px;}
+  .order-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line);}
+  .order-head h2{margin:0;font-size:15px;font-weight:700;}
+  .order-head .count{font-size:13px;color:var(--muted);}
+  .order-empty{padding:28px 16px;text-align:center;color:var(--muted);font-size:14px;}
+  .item{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #f0ece2;}
+  .item:last-child{border-bottom:none;}
+  .item.low{background:var(--warn-soft);}
+  .item .name{flex:1;font-size:17px;font-weight:600;}
+  .item .price{font-size:13px;color:var(--muted);min-width:64px;text-align:right;}
+  .item .low-tag{font-size:11px;color:var(--warn);font-weight:700;border:1px solid var(--warn);border-radius:6px;padding:1px 6px;margin-left:4px;}
+  .qty{display:flex;align-items:center;gap:6px;}
+  .qty button{width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:#fff;font-size:20px;line-height:1;cursor:pointer;color:var(--ink);}
+  .qty button:active{background:#eee;}
+  .qty .n{min-width:26px;text-align:center;font-size:18px;font-weight:700;}
+  .item .del{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:6px;text-decoration:underline;}
+
+  .totalbar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fbfaf6;border-top:1px solid var(--line);}
+  .totalbar .t-label{font-size:14px;color:var(--muted);}
+  .totalbar .t-val{font-size:22px;font-weight:800;}
+
+  /* タップ追加メニュー */
+  .quick h3{font-size:13px;color:var(--muted);font-weight:700;margin:0 0 8px;letter-spacing:.04em;}
+  .quick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:18px;}
+  .chip{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 10px;text-align:left;cursor:pointer;box-shadow:var(--shadow);}
+  .chip:active{background:var(--accent-soft);}
+  .chip .c-name{font-size:14px;font-weight:600;display:block;}
+  .chip .c-price{font-size:12px;color:var(--muted);}
+
+  /* 確定バー */
+  .footer{position:fixed;left:0;right:0;bottom:0;background:rgba(247,244,236,.96);backdrop-filter:blur(6px);border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:10px;max-width:880px;margin:0 auto;}
+  .btn{flex:1;border-radius:12px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn:active{transform:scale(.99);}
+
+  /* モーダル共通 */
+  .modal{position:fixed;inset:0;background:rgba(28,32,36,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:50;}
+  .modal.show{display:flex;}
+  .sheet{background:var(--paper);border-radius:16px;max-width:520px;width:100%;max-height:88vh;overflow:auto;box-shadow:var(--shadow);}
+  .sheet-head{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);}
+  .sheet-head h3{margin:0;font-size:16px;}
+  .sheet-head button{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);}
+  .sheet-body{padding:16px;}
+
+  /* 伝票 */
+  .ticket{background:#fff;color:#000;font-family:"Courier New",monospace;width:300px;margin:0 auto;padding:18px 16px;border:1px dashed #bbb;}
+  .ticket .tk-store{text-align:center;font-weight:bold;font-size:15px;letter-spacing:.1em;}
+  .ticket .tk-meta{text-align:center;font-size:11px;color:#444;margin:4px 0 10px;}
+  .ticket hr{border:none;border-top:1px dashed #999;margin:8px 0;}
+  .ticket .tk-line{display:flex;justify-content:space-between;font-size:13px;margin:3px 0;}
+  .ticket .tk-total{display:flex;justify-content:space-between;font-weight:bold;font-size:15px;margin-top:6px;}
+
+  /* メニュー編集 */
+  .menu-row{display:flex;gap:8px;align-items:center;margin-bottom:8px;}
+  .menu-row input{flex:1;padding:10px;border:1px solid var(--line);border-radius:9px;font-size:14px;}
+  .menu-row input.p{flex:0 0 90px;}
+  .menu-row .rm{background:none;border:none;color:var(--warn);cursor:pointer;font-size:13px;}
+  .add-row{background:var(--accent-soft);border:1px dashed var(--accent);color:var(--accent);border-radius:9px;padding:10px;width:100%;cursor:pointer;font-weight:600;margin-top:4px;}
+  .hint{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6;}
+  .nosupport{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px;display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="title">注文サポート<small>お客さまの声を文字に。読みあげて確認するだけ。</small></div>
+    <button class="menu-edit-btn" id="editMenuBtn">メニュー編集</button>
+  </header>
+
+  <div class="nosupport" id="nosupport">
+    このブラウザは音声入力に対応していないようです。下のメニューをタップして注文を作れます。（音声を使うにはパソコン/Androidの Chrome がおすすめです）
+  </div>
+
+  <div class="echo">
+    <div class="label">復唱してください</div>
+    <div class="sentence empty" id="echoLine">注文が入るとここに読みあげる文が出ます</div>
+  </div>
+
+  <div class="mic-row">
+    <button class="mic-btn" id="micBtn"><span class="mic-dot"></span><span id="micLabel">音声で聞き取る</span></button>
+    <div class="heard" id="heard">「ビール2つと枝豆ください」のように話しかけてください</div>
+  </div>
+
+  <div class="order-card">
+    <div class="order-head"><h2>注文</h2><span class="count" id="orderCount">0点</span></div>
+    <div id="orderList"><div class="order-empty">まだ注文はありません</div></div>
+    <div class="totalbar"><span class="t-label">合計（税込目安）</span><span class="t-val" id="total">¥0</span></div>
+  </div>
+
+  <div class="quick">
+    <h3>タップで追加（聞き取れないときに）</h3>
+    <div class="quick-grid" id="quickGrid"></div>
+  </div>
+</div>
+
+<div class="footer">
+  <button class="btn" id="clearBtn">全部消す</button>
+  <button class="btn primary" id="confirmBtn" disabled>確定して伝票へ</button>
+</div>
+
+<!-- 伝票モーダル -->
+<div class="modal" id="ticketModal">
+  <div class="sheet">
+    <div class="sheet-head"><h3>伝票プレビュー</h3><button id="closeTicket">×</button></div>
+    <div class="sheet-body">
+      <div class="ticket" id="ticket"></div>
+      <div class="footer" style="position:static;background:none;border:none;padding:16px 0 0;max-width:none;">
+        <button class="btn" id="backTicket">戻る</button>
+        <button class="btn primary" id="printBtn">印刷する</button>
+      </div>
+      <p class="hint">「印刷する」でブラウザの印刷画面が開きます。普通のプリンターで試せます。店舗ではここを80mm幅のレシートプリンターに置き換えます。</p>
+    </div>
+  </div>
+</div>
+
+<!-- メニュー編集モーダル -->
+<div class="modal" id="menuModal">
+  <div class="sheet">
+    <div class="sheet-head"><h3>メニュー編集</h3><button id="closeMenu">×</button></div>
+    <div class="sheet-body">
+      <div id="menuRows"></div>
+      <button class="add-row" id="addRow">＋ 品目を追加</button>
+      <p class="hint">店舗ごとにここを入れ替えるだけで、別のお店でも使えます。「呼び名」はお客さまが言いそうな言い方をカンマ区切りで足せます（例：生ビール,ビール,なま）。保存すると音声の聞き取りにも反映されます。</p>
+      <div class="footer" style="position:static;background:none;border:none;padding:8px 0 0;max-width:none;">
+        <button class="btn primary" id="saveMenu">保存する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- サンプルメニュー（居酒屋風）---------- */
+const defaultMenu = [
+  {name:"生ビール", price:550, aliases:["生ビール","ビール","なま","生中"]},
+  {name:"ハイボール", price:480, aliases:["ハイボール","ハイボ"]},
+  {name:"レモンサワー", price:480, aliases:["レモンサワー","レモンザワー","サワー"]},
+  {name:"ウーロン茶", price:300, aliases:["ウーロン茶","ウーロン","お茶"]},
+  {name:"枝豆", price:380, aliases:["枝豆","えだまめ"]},
+  {name:"冷奴", price:350, aliases:["冷奴","ひややっこ","やっこ"]},
+  {name:"唐揚げ", price:580, aliases:["唐揚げ","からあげ","から揚げ"]},
+  {name:"だし巻き卵", price:480, aliases:["だし巻き卵","だしまき","卵焼き","玉子焼き"]},
+  {name:"焼き鳥盛り合わせ", price:680, aliases:["焼き鳥","やきとり","焼き鳥盛り合わせ","盛り合わせ"]},
+  {name:"ポテトフライ", price:420, aliases:["ポテトフライ","ポテト","フライドポテト"]},
+  {name:"刺身盛り合わせ", price:980, aliases:["刺身","さしみ","刺身盛り合わせ","お造り"]},
+  {name:"締めのラーメン", price:600, aliases:["ラーメン","締めのラーメン","しめのラーメン"]},
+];
+
+let menu = JSON.parse(JSON.stringify(defaultMenu));
+let order = []; // {name, price, qty, low}
+
+/* ---------- 数字の言葉 → 数値 ---------- */
+const numWords = {
+  "ひとつ":1,"一つ":1,"いっこ":1,"1個":1,"一個":1,"ひとり":1,
+  "ふたつ":2,"二つ":2,"にこ":2,"2個":2,"二個":2,
+  "みっつ":3,"三つ":3,"さんこ":3,"3個":3,"三個":3,
+  "よっつ":4,"四つ":4,"よんこ":4,"4個":4,
+  "いつつ":5,"五つ":5,"ごこ":5,"5個":5,
+  "むっつ":6,"六つ":6,"ろっこ":6,
+  "ななつ":7,"七つ":7,"ななこ":7,
+  "やっつ":8,"八つ":8,"はちこ":8,
+  "ここのつ":9,"九つ":9,
+  "とお":10,"10個":10,
+};
+function parseQty(seg){
+  // 「2つ」「２つ」「2個」など算用数字
+  const m = seg.match(/([0-9０-９]+)\s*(つ|個|本|杯|皿|人前|名|枚)?/);
+  if(m){
+    const z = m[1].replace(/[０-９]/g, d=>"0123456789"["０１２３４５６７８９".indexOf(d)]);
+    const n = parseInt(z,10);
+    if(!isNaN(n) && n>0 && n<100) return n;
+  }
+  for(const w in numWords){ if(seg.includes(w)) return numWords[w]; }
+  return 1;
+}
+
+/* ---------- 発話 → 注文抽出 ---------- */
+function extractOrders(text){
+  const found = [];
+  let t = text.replace(/[、,]/g," ").replace(/\s+/g," ");
+  menu.forEach(item=>{
+    for(const alias of item.aliases){
+      let idx = t.indexOf(alias);
+      while(idx !== -1){
+        // alias の直後〜少し先で数量を探す
+        const after = t.slice(idx+alias.length, idx+alias.length+6);
+        const qty = parseQty(after);
+        found.push({name:item.name, price:item.price, qty});
+        // 同じ箇所を重複検出しないよう潰す
+        t = t.slice(0,idx) + " ".repeat(alias.length) + t.slice(idx+alias.length);
+        idx = t.indexOf(alias);
+      }
+    }
+  });
+  return found;
+}
+
+/* ---------- 注文へ反映 ---------- */
+function addToOrder(name, price, qty, low){
+  const ex = order.find(o=>o.name===name);
+  if(ex){ ex.qty += qty; if(low) ex.low=true; }
+  else order.push({name, price, qty, low:!!low});
+  render();
+}
+function changeQty(name, d){
+  const it = order.find(o=>o.name===name);
+  if(!it) return;
+  it.qty += d;
+  if(it.qty<=0) order = order.filter(o=>o.name!==name);
+  render();
+}
+function removeItem(name){ order = order.filter(o=>o.name!==name); render(); }
+
+/* ---------- 描画 ---------- */
+function yen(n){ return "¥"+n.toLocaleString(); }
+function echoSentence(){
+  if(order.length===0) return null;
+  const parts = order.map(o=>`${o.name} ${o.qty}つ`);
+  const total = order.reduce((s,o)=>s+o.price*o.qty,0);
+  return `${parts.join("、")}、以上で ${yen(total)} です`;
+}
+function render(){
+  const list = document.getElementById("orderList");
+  const total = order.reduce((s,o)=>s+o.price*o.qty,0);
+  const cnt = order.reduce((s,o)=>s+o.qty,0);
+  document.getElementById("orderCount").textContent = cnt+"点";
+  document.getElementById("total").textContent = yen(total);
+  document.getElementById("confirmBtn").disabled = order.length===0;
+
+  if(order.length===0){
+    list.innerHTML = '<div class="order-empty">まだ注文はありません</div>';
+  } else {
+    list.innerHTML = order.map(o=>`
+      <div class="item ${o.low?'low':''}">
+        <span class="name">${o.name}${o.low?'<span class="low-tag">要確認</span>':''}</span>
+        <span class="qty">
+          <button onclick="changeQty('${o.name}',-1)">−</button>
+          <span class="n">${o.qty}</span>
+          <button onclick="changeQty('${o.name}',1)">＋</button>
+        </span>
+        <span class="price">${yen(o.price*o.qty)}</span>
+        <button class="del" onclick="removeItem('${o.name}')">消す</button>
+      </div>`).join("");
+  }
+  const echo = document.getElementById("echoLine");
+  const s = echoSentence();
+  if(s){ echo.textContent = s; echo.classList.remove("empty"); }
+  else { echo.textContent = "注文が入るとここに読みあげる文が出ます"; echo.classList.add("empty"); }
+}
+
+function renderQuick(){
+  document.getElementById("quickGrid").innerHTML = menu.map(m=>`
+    <button class="chip" onclick="addToOrder('${m.name}',${m.price},1,false)">
+      <span class="c-name">${m.name}</span>
+      <span class="c-price">${yen(m.price)}</span>
+    </button>`).join("");
+}
+
+/* ---------- 音声認識 ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog = null, listening = false;
+function setupRecog(){
+  if(!SR){ document.getElementById("nosupport").style.display="block"; return; }
+  recog = new SR();
+  recog.lang = "ja-JP";
+  recog.interimResults = true;
+  recog.continuous = false;
+  recog.onresult = (e)=>{
+    let interim="", final="";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      if(r.isFinal) final += r[0].transcript; else interim += r[0].transcript;
+    }
+    const heard = document.getElementById("heard");
+    heard.classList.add("has");
+    heard.textContent = (final||interim);
+    if(final){
+      const conf = e.results[e.results.length-1][0].confidence;
+      const low = (conf !== undefined && conf < 0.6);
+      const orders = extractOrders(final);
+      if(orders.length){
+        orders.forEach(o=>addToOrder(o.name,o.price,o.qty,low));
+      } else {
+        heard.textContent = "「"+final+"」… メニューが聞き取れませんでした。タップで追加してください。";
+      }
+    }
+  };
+  recog.onend = ()=>{ listening=false; updateMic(); };
+  recog.onerror = ()=>{ listening=false; updateMic(); };
+}
+function updateMic(){
+  const b=document.getElementById("micBtn"), l=document.getElementById("micLabel");
+  if(listening){ b.classList.add("listening"); l.textContent="聞き取り中… タップで停止"; }
+  else { b.classList.remove("listening"); l.textContent="音声で聞き取る"; }
+}
+document.getElementById("micBtn").onclick = ()=>{
+  if(!recog){ return; }
+  if(listening){ recog.stop(); listening=false; updateMic(); return; }
+  try{ recog.start(); listening=true; updateMic();
+    document.getElementById("heard").textContent="どうぞ、お話しください…";
+    document.getElementById("heard").classList.remove("has");
+  }catch(_){}
+};
+
+/* ---------- 伝票 ---------- */
+function buildTicket(){
+  const now = new Date();
+  const ds = now.getFullYear()+"/"+String(now.getMonth()+1).padStart(2,"0")+"/"+String(now.getDate()).padStart(2,"0")+
+    " "+String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+  const total = order.reduce((s,o)=>s+o.price*o.qty,0);
+  const lines = order.map(o=>`<div class="tk-line"><span>${o.name} ×${o.qty}</span><span>${yen(o.price*o.qty)}</span></div>`).join("");
+  document.getElementById("ticket").innerHTML = `
+    <div class="tk-store">ご注文票</div>
+    <div class="tk-meta">${ds}</div>
+    <hr>
+    ${lines}
+    <hr>
+    <div class="tk-total"><span>合計</span><span>${yen(total)}</span></div>
+  `;
+}
+document.getElementById("confirmBtn").onclick = ()=>{ buildTicket(); show("ticketModal"); };
+document.getElementById("closeTicket").onclick = ()=>hide("ticketModal");
+document.getElementById("backTicket").onclick = ()=>hide("ticketModal");
+document.getElementById("printBtn").onclick = ()=>window.print();
+document.getElementById("clearBtn").onclick = ()=>{ if(order.length&&confirm("注文を全部消しますか？")){ order=[]; render(); } };
+
+/* ---------- メニュー編集 ---------- */
+function renderMenuRows(){
+  document.getElementById("menuRows").innerHTML = menu.map((m,i)=>`
+    <div class="menu-row">
+      <input value="${m.name}" data-i="${i}" data-f="name" placeholder="品名">
+      <input class="p" value="${m.price}" data-i="${i}" data-f="price" placeholder="価格" inputmode="numeric">
+      <button class="rm" data-rm="${i}">削除</button>
+    </div>
+    <div class="menu-row">
+      <input value="${m.aliases.join(',')}" data-i="${i}" data-f="aliases" placeholder="呼び名（カンマ区切り）" style="font-size:12px;color:#7a756b;">
+    </div>`).join("");
+  document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ menu.splice(+b.dataset.rm,1); renderMenuRows(); });
+}
+document.getElementById("editMenuBtn").onclick = ()=>{ renderMenuRows(); show("menuModal"); };
+document.getElementById("closeMenu").onclick = ()=>hide("menuModal");
+document.getElementById("addRow").onclick = ()=>{ menu.push({name:"",price:0,aliases:[]}); renderMenuRows(); };
+document.getElementById("saveMenu").onclick = ()=>{
+  const rows = {};
+  document.querySelectorAll("#menuRows input").forEach(inp=>{
+    const i=inp.dataset.i, f=inp.dataset.f;
+    rows[i]=rows[i]||{};
+    rows[i][f]=inp.value;
+  });
+  const next=[];
+  Object.keys(rows).forEach(i=>{
+    const r=rows[i];
+    if(!r.name || !r.name.trim()) return;
+    const aliases = (r.aliases||"").split(",").map(s=>s.trim()).filter(Boolean);
+    if(!aliases.includes(r.name.trim())) aliases.unshift(r.name.trim());
+    next.push({name:r.name.trim(), price:parseInt(r.price,10)||0, aliases});
+  });
+  menu = next;
+  renderQuick();
+  hide("menuModal");
+};
+
+function show(id){ document.getElementById(id).classList.add("show"); }
+function hide(id){ document.getElementById(id).classList.remove("show"); }
+
+/* ---------- 起動 ---------- */
+setupRecog();
+renderQuick();
+render();
+</script>
+</body>
+</html>
