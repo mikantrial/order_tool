@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>注文サポート</title>
+<link rel="manifest" href="../manifest.json">
+<meta name="theme-color" content="#2f6f4f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="注文サポート">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#1c2024;--paper:#f7f4ec;--card:#ffffff;--line:#e3ddd0;
+  --accent:#2f6f4f;--accent-soft:#e7f0ea;
+  --warn:#b4541f;--warn-soft:#f7e9df;
+  --muted:#7a756b;--radius:14px;--navy:#2b4a6f;
+}
+html,body{height:100%;overflow:hidden;}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Yu Gothic","Noto Sans JP",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ===== 共通：ステップ画面 ===== */
+.step{
+  position:fixed;inset:0;display:none;
+  flex-direction:column;background:var(--paper);
+}
+.step.active{display:flex;}
+
+/* ステップヘッダー */
+.step-head{
+  flex:0 0 auto;display:flex;align-items:center;gap:10px;
+  padding:12px 16px;background:var(--card);
+  border-bottom:1px solid var(--line);
+}
+.store-name{font-size:15px;font-weight:700;flex:1;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.step-badge{
+  font-size:11px;font-weight:700;color:var(--muted);
+  background:var(--paper);border:1px solid var(--line);
+  border-radius:999px;padding:3px 10px;white-space:nowrap;
+}
+
+/* ===== STEP 1: スタート ===== */
+#step1{align-items:center;justify-content:center;gap:0;}
+.start-wrap{text-align:center;padding:32px 24px;}
+.start-store{font-size:22px;font-weight:800;margin-bottom:8px;}
+.start-sub{font-size:14px;color:var(--muted);margin-bottom:48px;}
+.start-btn{
+  width:200px;height:200px;border-radius:50%;border:none;
+  background:var(--accent);color:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:12px;cursor:pointer;margin:0 auto;
+  box-shadow:0 8px 32px rgba(47,111,79,.35);
+  transition:transform .1s,box-shadow .1s;
+}
+.start-btn:active{transform:scale(.96);box-shadow:0 4px 16px rgba(47,111,79,.3);}
+.start-btn svg{opacity:.95;}
+.start-label{font-size:20px;font-weight:700;letter-spacing:.04em;}
+
+/* ===== STEP 2: テーブル番号 ===== */
+.step2-body{
+  flex:1;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:32px 24px;gap:32px;
+}
+.step2-title{font-size:20px;font-weight:700;text-align:center;}
+.table-select-wrap{text-align:center;}
+.table-select-wrap label{
+  display:block;font-size:13px;color:var(--muted);
+  margin-bottom:12px;font-weight:700;letter-spacing:.04em;
+}
+.table-select{
+  font-size:36px;font-weight:800;color:var(--ink);
+  border:2px solid var(--line);border-radius:14px;
+  background:var(--card);padding:14px 24px;
+  text-align:center;width:200px;
+  appearance:none;cursor:pointer;
+}
+.table-select:focus{outline:2px solid var(--accent);}
+.next-btn{
+  width:100%;max-width:320px;padding:18px;
+  border-radius:14px;border:none;
+  background:var(--accent);color:#fff;
+  font-size:18px;font-weight:700;cursor:pointer;
+  box-shadow:0 4px 16px rgba(47,111,79,.25);
+  transition:transform .1s;
+}
+.next-btn:active{transform:scale(.98);}
+
+/* ===== STEP 3: 注文入力 ===== */
+/* 上部バー */
+.step3-top{
+  flex:0 0 auto;display:flex;align-items:center;
+  gap:10px;padding:10px 14px;
+  background:var(--card);border-bottom:1px solid var(--line);
+}
+.table-badge{
+  font-size:13px;font-weight:700;
+  background:var(--navy);color:#fff;
+  border-radius:999px;padding:4px 12px;
+  white-space:nowrap;
+}
+/* 注文入力ボタン（固定上部） */
+.order-input-bar{
+  flex:0 0 auto;padding:10px 14px;
+  background:var(--paper);border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:10px;
+}
+.order-input-btn{
+  flex:1;padding:14px;border-radius:12px;border:none;
+  font-size:16px;font-weight:700;cursor:pointer;
+  background:var(--accent-soft);color:var(--accent);
+  border:1.5px solid var(--accent);
+  transition:background .1s;
+}
+.order-input-btn.listening{
+  background:var(--accent);color:#fff;
+  border-color:var(--accent);
+  font-size:18px;
+  animation:btn-flash 1s ease-in-out infinite;
+  letter-spacing:.04em;
+}
+@keyframes btn-flash{
+  0%,100%{background:var(--accent);box-shadow:0 0 0 0 rgba(47,111,79,.5);}
+  50%{background:#1d5235;box-shadow:0 0 0 8px rgba(47,111,79,0);}
+}
+.order-input-btn.analyzing{
+  background:#e8e4da;color:var(--muted);
+  border-color:var(--line);cursor:not-allowed;
+  animation:none;outline:none;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinner{
+  display:inline-block;width:16px;height:16px;
+  border:2px solid var(--line);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite;
+  vertical-align:middle;margin-right:6px;
+}
+.order-input-btn:active{transform:scale(.98);}
+/* メニュースクロールエリア */
+.step3-menu{flex:1;overflow-y:auto;padding:10px 12px 80px;}
+.guide-text{
+  font-size:20px;font-weight:700;color:var(--ink);
+  padding:8px 2px 12px;line-height:1.45;
+}
+.guide-text.listening{color:var(--accent);}
+/* 聞き取りテキスト */
+.transcript-bar{
+  font-size:12px;color:var(--muted);
+  padding:4px 14px;min-height:24px;
+  border-bottom:1px solid var(--line);
+  background:#fbfaf6;flex:0 0 auto;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+/* メニューグリッド */
+.menu-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+  gap:8px;
+}
+.menu-chip{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:10px 10px 8px;
+  display:flex;flex-direction:column;gap:3px;
+  transition:background .15s,border-color .15s;
+}
+.menu-chip.ordered{background:var(--accent-soft);border-color:var(--accent);}
+.menu-chip.stopped{background:#f9f6f0;border-color:#e0d4c4;opacity:.65;}
+.chip-name{font-size:14px;font-weight:700;color:var(--ink);}
+.chip-reading{font-size:11px;color:var(--muted);}
+.chip-price{font-size:13px;color:var(--muted);}
+.chip-stop{font-size:10px;color:var(--warn);font-weight:700;margin-top:2px;}
+.chip-qty{display:flex;align-items:center;gap:6px;margin-top:6px;}
+.chip-qty-btn{
+  width:26px;height:26px;border-radius:7px;
+  border:1px solid var(--line);background:#fff;
+  font-size:16px;cursor:pointer;color:var(--ink);
+  display:flex;align-items:center;justify-content:center;flex:0 0 26px;
+}
+.menu-chip.ordered .chip-qty-btn{border-color:var(--accent);}
+.chip-qty-btn:active{background:#e8e4da;}
+.chip-qty-n{min-width:20px;text-align:center;font-size:15px;font-weight:700;}
+/* 品切れバナー */
+.stop-banner{
+  flex:0 0 auto;background:var(--warn-soft);color:var(--warn);
+  font-size:13px;font-weight:700;padding:7px 14px;
+  border-bottom:1px solid #f5c4a0;display:none;
+}
+/* STEP3フッター */
+.step3-footer{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(247,244,236,.96);backdrop-filter:blur(6px);
+  border-top:1px solid var(--line);
+  padding:10px 14px;display:flex;gap:8px;
+}
+.btn{
+  flex:1;border-radius:11px;padding:13px 6px;
+  font-size:14px;font-weight:700;cursor:pointer;
+  border:1px solid var(--line);background:#fff;color:var(--ink);
+}
+.btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+.btn.navy{background:var(--navy);color:#fff;border-color:var(--navy);}
+.btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn:active{transform:scale(.98);}
+
+/* ===== STEP 4: 確認 ===== */
+.cv-head{
+  flex:0 0 auto;background:var(--navy);color:#fff;
+  padding:14px 16px 12px;
+}
+.cv-head .q{font-size:19px;font-weight:700;line-height:1.6;}
+.cv-head .q rt{font-size:11px;font-weight:400;opacity:.85;}
+.cv-head .cv-table-badge{font-size:13px;opacity:.8;margin-top:4px;}
+.cv-body{flex:1;overflow-y:auto;padding:12px 12px 0;}
+.cv-summary{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:4px 14px 12px;
+  margin-bottom:6px;
+}
+.order-list{margin-bottom:4px;min-height:40vh;}
+.order-item{
+  display:flex;align-items:center;gap:8px;
+  padding:12px 0;border-bottom:1px solid var(--line);
+}
+.order-item:last-child{border-bottom:none;}
+.oi-name{flex:1;font-size:18px;font-weight:700;}
+.oi-qty{display:flex;align-items:center;gap:6px;}
+.oi-qty button{
+  width:32px;height:32px;border-radius:8px;
+  border:1px solid var(--line);background:#fff;
+  font-size:18px;cursor:pointer;color:var(--ink);
+}
+.oi-qty button:active{background:#eee;}
+.oi-n{min-width:24px;text-align:center;font-size:18px;font-weight:700;}
+.oi-price{font-size:13px;color:var(--muted);min-width:60px;text-align:right;}
+.oi-del{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;text-decoration:underline;padding:4px;}
+.cv-total{
+  display:flex;justify-content:space-between;align-items:baseline;
+  padding:10px 0;font-size:20px;font-weight:700;
+  border-top:2px solid var(--ink);margin-bottom:4px;
+}
+.cv-tax{font-size:12px;color:var(--muted);}
+.cv-menu-label{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.05em;margin:24px 0 8px;}
+.cv-menu-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
+  gap:6px;margin-bottom:80px;
+}
+.cv-chip{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:10px;padding:10px 8px;cursor:pointer;text-align:left;
+}
+.cv-chip:active{background:var(--accent-soft);}
+.cv-chip .cn{font-size:13px;font-weight:700;}
+.cv-chip .cp{font-size:11px;color:var(--muted);}
+.step4-footer{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(247,244,236,.96);backdrop-filter:blur(6px);
+  border-top:1px solid var(--line);
+  padding:10px 14px;display:flex;gap:8px;
+}
+
+/* ===== STEP 5: 伝票 ===== */
+.ticket-body{flex:1;overflow-y:auto;padding:20px 16px 80px;}
+.ticket{
+  background:#fff;color:#000;font-family:"Courier New",monospace;
+  max-width:320px;margin:0 auto;padding:20px 16px;
+  border:1px dashed #bbb;border-radius:4px;
+}
+.tk-store{text-align:center;font-weight:bold;font-size:15px;letter-spacing:.1em;}
+.tk-meta{text-align:center;font-size:11px;color:#444;margin:4px 0 10px;}
+.tk-line{display:flex;justify-content:space-between;font-size:13px;margin:3px 0;}
+.tk-total{display:flex;justify-content:space-between;font-weight:bold;font-size:15px;margin-top:6px;}
+.tk-tax{display:flex;justify-content:space-between;font-size:11px;color:#555;margin-top:3px;}
+.tk-note{margin-top:12px;padding-top:8px;border-top:1px dashed #999;font-size:10px;color:#555;line-height:1.5;}
+.step5-footer{
+  position:fixed;bottom:0;left:0;right:0;
+  background:rgba(247,244,236,.96);backdrop-filter:blur(6px);
+  border-top:1px solid var(--line);
+  padding:10px 14px;display:flex;gap:8px;
+}
+</style>
+</head>
+<body>
+
+<!-- ===== STEP 1: スタート ===== -->
+<div class="step active" id="step1">
+  <div class="start-wrap">
+    <div class="start-store" id="startStoreName">読み込み中…</div>
+    <div class="start-sub">注文サポート</div>
+    <button class="start-btn" id="startBtn">
+      <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+        <rect x="20" y="8" width="16" height="26" rx="8" stroke="#fff" stroke-width="3"/>
+        <path d="M10 28 Q10 46 28 46 Q46 46 46 28" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none"/>
+        <line x1="28" y1="46" x2="28" y2="52" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+        <line x1="18" y1="52" x2="38" y2="52" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+      </svg>
+      <span class="start-label">スタート</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== STEP 2: テーブル番号 ===== -->
+<div class="step" id="step2">
+  <div class="step-head">
+    <span class="store-name" id="step2StoreName"></span>
+    <span class="step-badge">STEP 1 / 3</span>
+  </div>
+  <div class="step2-body">
+    <div class="step2-title">テーブル番号を<br>選んでください</div>
+    <div class="table-select-wrap">
+      <label for="tableNo">テーブル番号</label>
+      <select class="table-select" id="tableNo"></select>
+    </div>
+    <button class="next-btn" id="step2Next">次へ　→　録音スタート</button>
+  </div>
+</div>
+
+<!-- ===== STEP 3: 注文入力 ===== -->
+<div class="step" id="step3">
+  <div class="step-head">
+    <span class="store-name" id="step3StoreName"></span>
+    <span class="table-badge" id="step3TableBadge"></span>
+    <span class="step-badge">STEP 2 / 3</span>
+  </div>
+
+  <div class="order-input-bar">
+    <button class="order-input-btn listening" id="orderInputBtn">
+      聞き取り中…
+    </button>
+  </div>
+
+  <div class="transcript-bar" id="heard"></div>
+  <div class="stop-banner" id="stopBanner"></div>
+
+  <div class="step3-menu">
+    <div class="guide-text listening" id="guideText">ご注文をどうぞお聞かせください</div>
+    <div class="menu-grid" id="menuGrid"></div>
+  </div>
+
+  <div class="step3-footer">
+    <button class="btn" id="step3Back">← 戻る</button>
+    <button class="btn" id="step3Clear">全部消す</button>
+    <button class="btn primary" id="step3Next" disabled>次へ →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 4: 確認 ===== -->
+<div class="step" id="step4">
+  <div class="step-head">
+    <span class="store-name" id="step4StoreName"></span>
+    <span class="table-badge" id="step4HeaderBadge"></span>
+    <span class="step-badge">STEP 3 / 3</span>
+  </div>
+  <div class="cv-head">
+    <div class="q">
+      <ruby>こちら<rt>　</rt></ruby>の<ruby>ご注文<rt>ごちゅうもん</rt></ruby>で<br>
+      お<ruby>間違<rt>まちがい</rt></ruby>いないでしょうか？
+    </div>
+    <div class="cv-table-badge" id="step4TableBadge"></div>
+  </div>
+  <div class="cv-body">
+    <div class="cv-summary">
+      <div class="order-list" id="cvOrderList"></div>
+      <div class="cv-total"><span>合計</span><span id="cvTotal">¥0</span></div>
+      <div class="cv-tax" id="cvTax"></div>
+    </div>
+    <div class="cv-menu-label">追加する場合はタップ</div>
+    <div class="cv-menu-grid" id="cvMenuGrid"></div>
+  </div>
+  <div class="step4-footer">
+    <button class="btn" id="step4Back">← 戻る</button>
+    <button class="btn" id="step4Clear">全部消す</button>
+    <button class="btn primary" id="step4Next">伝票へ →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 5: 伝票 ===== -->
+<div class="step" id="step5">
+  <div class="step-head">
+    <span class="store-name" id="step5StoreName"></span>
+    <span class="table-badge" id="step5TableBadge"></span>
+  </div>
+  <div class="ticket-body">
+    <div class="ticket" id="ticket"></div>
+  </div>
+  <div class="step5-footer">
+    <button class="btn" id="step5Back">← 戻る</button>
+    <button class="btn" id="step5Again">最初から</button>
+    <button class="btn primary" onclick="window.print()">印刷する</button>
+  </div>
+</div>
+
+<script>
+const ANALYZE_API_URL = "/order-support/api/analyze-order.php";
+const MENU_API_URL    = "/order-support/api/menu-api.php";
+
+function getSlugFromUrl(){
+  const m = location.pathname.match(/\/stores\/([^\/]+)/);
+  return m ? m[1] : null;
+}
+const STORE_SLUG = getSlugFromUrl();
+
+let menu      = [];
+let order     = [];
+let taxRate   = 10;
+let storeName = '';
+
+function yen(n){ return '¥' + Number(n).toLocaleString(); }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ---------- ステップ切り替え ---------- */
+function goStep(n){
+  document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('step'+n).classList.add('active');
+}
+
+/* ---------- メニュー読み込み ---------- */
+async function loadMenu(){
+  if(!STORE_SLUG) return;
+  try{
+    const res  = await fetch(`${MENU_API_URL}?action=get_menu&slug=${STORE_SLUG}`);
+    const data = await res.json();
+    if(!data.ok) throw new Error(data.error);
+    storeName = data.store.name;
+    taxRate   = data.store.tax_rate;
+    document.title = storeName + ' 注文サポート';
+    ['startStoreName','step2StoreName','step3StoreName','step4StoreName','step5StoreName']
+      .forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=storeName; });
+    menu = data.menus;
+    updateStopBanner();
+    renderMenuGrid();
+  }catch(e){
+    document.getElementById('heard').textContent = 'メニューの読み込みに失敗しました: ' + e.message;
+  }
+}
+
+function updateStopBanner(){
+  const stopped = menu.filter(m=>m.is_stopped);
+  const b = document.getElementById('stopBanner');
+  if(stopped.length > 0){
+    b.style.display='block';
+    b.textContent='⚠️ 本日品切れ：' + stopped.map(m=>m.name).join('・');
+  } else { b.style.display='none'; }
+}
+
+/* ---------- テーブル番号 ---------- */
+function setupTables(){
+  const sel = document.getElementById('tableNo');
+  let html = '<option value="">未設定</option>';
+  for(let i=1;i<=30;i++) html += `<option value="${i}">${i}番</option>`;
+  sel.innerHTML = html;
+}
+function getTable(){ return document.getElementById('tableNo').value; }
+function updateTableBadges(){
+  const t = getTable();
+  const label = t ? 'テーブル '+t+'番' : '';
+  ['step3TableBadge','step4HeaderBadge','step4TableBadge','step5TableBadge']
+    .forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=label; });
+}
+
+/* ---------- メニューグリッド ---------- */
+function renderMenuGrid(){
+  const grid = document.getElementById('menuGrid');
+  if(!grid) return;
+  grid.innerHTML = menu.map(m=>{
+    const it = order.find(o=>o.name===m.name);
+    const qty = it ? it.qty : 0;
+    const reading = '';  // STEP3では読みがなを表示しない
+    if(m.is_stopped){
+      return `<div class="menu-chip stopped">
+        <span class="chip-name">${escHtml(m.name)}</span>
+        ${reading}
+        <span class="chip-price">${yen(m.price)}</span>
+        <span class="chip-stop">品切れ</span>
+      </div>`;
+    }
+    const nm = m.name.replace(/'/g,"\\'");
+    return `<div class="menu-chip ${qty>0?'ordered':''}">
+      <span class="chip-name">${escHtml(m.name)}</span>
+      ${reading}
+      <span class="chip-price">${yen(m.price)}</span>
+      <div class="chip-qty">
+        <button class="chip-qty-btn" onclick="chipChange('${nm}',-1)">−</button>
+        <span class="chip-qty-n">${qty}</span>
+        <button class="chip-qty-btn" onclick="chipChange('${nm}',1)">＋</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // STEP4のメニューグリッドも更新
+  const cvGrid = document.getElementById('cvMenuGrid');
+  if(cvGrid){
+    cvGrid.innerHTML = menu.filter(m=>!m.is_stopped).map(m=>`
+      <button class="cv-chip" onclick="addItem('${m.name.replace(/'/g,"\\'")}');renderStep4()">
+        <div class="cn">${escHtml(m.name)}</div>
+        <div class="cp">${yen(m.price)}</div>
+      </button>`).join('');
+  }
+}
+
+/* ---------- 注文操作 ---------- */
+function chipChange(name, d){
+  const m = menu.find(x=>x.name===name);
+  if(!m||m.is_stopped) return;
+  const ex = order.find(o=>o.name===name);
+  if(ex){ ex.qty+=d; if(ex.qty<=0) order=order.filter(o=>o.name!==name); }
+  else if(d>0){ order.push({name:m.name,price:m.price,qty:1}); }
+  updateStep3Footer();
+  renderMenuGrid();
+}
+function addItem(name){
+  const m = menu.find(x=>x.name===name);
+  if(!m||m.is_stopped) return;
+  const ex = order.find(o=>o.name===name);
+  if(ex){ ex.qty++; } else { order.push({name:m.name,price:m.price,qty:1}); }
+  updateStep3Footer();
+  renderMenuGrid();
+}
+function changeQty(name,d){
+  const it = order.find(o=>o.name===name);
+  if(!it) return;
+  it.qty+=d;
+  if(it.qty<=0) order=order.filter(o=>o.name!==name);
+  renderStep4();
+  renderMenuGrid();
+}
+function removeItem(name){
+  order=order.filter(o=>o.name!==name);
+  renderStep4();
+  renderMenuGrid();
+}
+function rebuildOrderFrom(items){
+  order=[];
+  const stopped=[];
+  items.forEach(it=>{
+    const m=menu.find(x=>x.name===it.name);
+    if(!m) return;
+    if(m.is_stopped){ stopped.push(m.name); return; }
+    const qty=Math.max(1,parseInt(it.qty,10)||1);
+    const ex=order.find(o=>o.name===m.name);
+    if(ex){ ex.qty+=qty; } else { order.push({name:m.name,price:m.price,qty}); }
+  });
+  if(stopped.length>0){
+    const h=document.getElementById('heard');
+    h.textContent+='　／　'+stopped.join('・')+' は本日品切れです';
+  }
+  updateStep3Footer();
+  renderMenuGrid();
+}
+function calcTotal(){ return order.reduce((s,o)=>s+o.price*o.qty,0); }
+function updateStep3Footer(){
+  document.getElementById('step3Next').disabled = order.length===0;
+}
+
+/* ---------- 音声認識 ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog=null, listening=false, wantListen=false, fullTranscript='';
+
+function setupRecog(){
+  if(!SR) return;
+  recog=new SR();
+  recog.lang='ja-JP';
+  recog.interimResults=true;
+  recog.continuous=true;
+  recog.onresult=(e)=>{
+    let interim='',finalChunk='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      if(r.isFinal) finalChunk+=r[0].transcript; else interim+=r[0].transcript;
+    }
+    if(finalChunk) fullTranscript+=finalChunk;
+    const h=document.getElementById('heard');
+    h.textContent=(fullTranscript+interim)||'…';
+  };
+  recog.onend=()=>{
+    if(wantListen){ try{ recog.start(); return; }catch(_){} }
+    listening=false;
+  };
+  recog.onerror=(e)=>{
+    if(e.error==='not-allowed'||e.error==='service-not-allowed'){
+      wantListen=false; listening=false; updateOrderInputBtn(false);
+    }
+  };
+}
+function startRec(){
+  if(!recog) return;
+  fullTranscript='';
+  try{
+    wantListen=true; recog.start(); listening=true;
+    updateOrderInputBtn('listening');
+    document.getElementById('heard').textContent='';
+    document.getElementById('guideText').classList.add('listening');
+  }catch(_){ wantListen=false; }
+}
+function stopRec(cb){
+  wantListen=false;
+  try{ recog.stop(); }catch(_){}
+  listening=false;
+  document.getElementById('guideText').classList.remove('listening');
+  if(cb) cb();
+}
+function updateOrderInputBtn(state){
+  // state: 'listening' | 'done' | 'analyzing'
+  const btn = document.getElementById('orderInputBtn');
+  btn.classList.remove('listening','analyzing');
+  if(state==='listening'){
+    btn.classList.add('listening');
+    btn.textContent='聞き取り中…';
+    btn.disabled = false;
+  } else if(state==='analyzing'){
+    btn.classList.add('analyzing');
+    btn.innerHTML='<span class="spinner"></span>解析中…しばらくお待ちください';
+    btn.disabled = true;
+  } else {
+    // done: 再録音
+    btn.textContent='🔄 再録音';
+    btn.disabled = false;
+  }
+}
+
+/* ---------- AI解析 ---------- */
+function setAnalyzing(on){
+  const next  = document.getElementById('step3Next');
+  if(on){
+    updateOrderInputBtn('analyzing');
+    if(next) next.disabled = true;
+  } else {
+    updateOrderInputBtn('done');
+    updateStep3Footer();
+  }
+}
+
+async function analyzeTranscript(text){
+  const h=document.getElementById('heard');
+  if(!ANALYZE_API_URL||!text.trim()) return;
+  h.textContent='解析中…';
+  setAnalyzing(true);
+
+  // 30秒でタイムアウト
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 30000);
+
+  try{
+    const res=await fetch(ANALYZE_API_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        transcript:text,
+        menu:menu.map(m=>({name:m.name,aliases:m.aliases,is_stopped:m.is_stopped}))
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    const data=await res.json();
+    if(!data.ok) throw new Error(data.error);
+    rebuildOrderFrom(data.order);
+    h.textContent=data.order.length===0
+      ? '「'+text+'」… 注文を読み取れませんでした。タップで追加してください。'
+      : '聞き取り完了：'+text;
+  }catch(err){
+    clearTimeout(timeoutId);
+    if(err.name==='AbortError'){
+      h.textContent='タイムアウトしました。タップで手入力してください。';
+    } else {
+      h.textContent='AI解析エラー: '+(err.message||err)+'　→ タップで手入力できます';
+    }
+    console.error('analyzeTranscript error:',err);
+  } finally {
+    setAnalyzing(false);
+  }
+}
+
+/* ---------- STEP4描画 ---------- */
+function renderStep4(){
+  const total=calcTotal();
+  const tax=taxRate>0?Math.round(total-total/(1+taxRate/100)):0;
+  const t=getTable();
+  document.getElementById('step4TableBadge').textContent=t?'テーブル '+t+'番':'';
+  document.getElementById('cvTotal').textContent=yen(total);
+  const taxEl=document.getElementById('cvTax');
+  taxEl.textContent=taxRate>0?`（うち消費税${taxRate}%　${yen(tax)}）`:'';
+  document.getElementById('cvOrderList').innerHTML=order.length===0
+    ?'<p style="color:var(--muted);font-size:14px;padding:20px 0;">まだ注文はありません</p>'
+    :order.map(o=>`
+      <div class="order-item">
+        <span class="oi-name">${escHtml(o.name)}</span>
+        <span class="oi-qty">
+          <button onclick="changeQty('${o.name.replace(/'/g,"\\'")}', -1)">−</button>
+          <span class="oi-n">${o.qty}</span>
+          <button onclick="changeQty('${o.name.replace(/'/g,"\\'")}', 1)">＋</button>
+        </span>
+        <span class="oi-price">${yen(o.price*o.qty)}</span>
+        <button class="oi-del" onclick="removeItem('${o.name.replace(/'/g,"\\'")}')">消す</button>
+      </div>`).join('');
+}
+
+/* ---------- STEP5（伝票）描画 ---------- */
+function buildTicket(){
+  const now=new Date();
+  const ds=now.getFullYear()+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+String(now.getDate()).padStart(2,'0')
+    +' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  const total=calcTotal();
+  const tax=taxRate>0?Math.round(total-total/(1+taxRate/100)):0;
+  const t=getTable();
+  const tableLine=t?`<div class="tk-store" style="font-size:16px;">テーブル ${t}番</div>`:'';
+  const lines=order.map(o=>`<div class="tk-line"><span>${o.name} ×${o.qty}</span><span>${yen(o.price*o.qty)}</span></div>`).join('');
+  const taxLine=taxRate>0?`<div class="tk-tax"><span>（うち消費税${taxRate}%）</span><span>${yen(tax)}</span></div>`:'';
+  document.getElementById('ticket').innerHTML=`
+    ${tableLine}
+    <div class="tk-store">ご注文の控え</div>
+    <div class="tk-meta">${storeName}　${ds}</div>
+    <hr style="border:none;border-top:1px dashed #999;margin:8px 0;">
+    ${lines}
+    <hr style="border:none;border-top:1px dashed #999;margin:8px 0;">
+    <div class="tk-total"><span>合計</span><span>${yen(total)}</span></div>
+    ${taxLine}
+    <div class="tk-note">※こちらは注文の控えです。<br>　お会計はレジにて承ります。</div>`;
+  document.getElementById('step5TableBadge').textContent=t?'テーブル '+t+'番':'';
+}
+
+/* ---------- ボタンイベント ---------- */
+// STEP1
+document.getElementById('startBtn').onclick=()=>goStep(2);
+
+// STEP2
+document.getElementById('step2Next').onclick=()=>{
+  updateTableBadges();
+  goStep(3);
+  // 少し待ってから録音スタート（画面遷移の完了を待つ）
+  setTimeout(()=>startRec(), 300);
+};
+
+// STEP3
+document.getElementById('orderInputBtn').onclick=async ()=>{
+  const btn = document.getElementById('orderInputBtn');
+  if(btn.disabled) return;
+
+  if(listening){
+    // 聞き取り中 → 停止してAI解析
+    const text=fullTranscript.trim();
+    stopRec(null);
+    if(text) await analyzeTranscript(text);
+    else updateOrderInputBtn('done');
+  } else {
+    // 再録音 → 録音スタート
+    order=[]; fullTranscript='';
+    updateStep3Footer(); renderMenuGrid();
+    document.getElementById('heard').textContent='';
+    setTimeout(()=>startRec(), 100);
+  }
+};
+document.getElementById('step3Back').onclick=()=>{
+  stopRec(null);
+  order=[]; updateStep3Footer(); renderMenuGrid();
+  goStep(2);
+};
+document.getElementById('step3Clear').onclick=()=>{
+  if(confirm('注文を全部消しますか？')){ order=[]; updateStep3Footer(); renderMenuGrid(); }
+};
+document.getElementById('step3Next').onclick=()=>{
+  // 録音中なら止めてから遷移
+  if(listening){
+    const text=fullTranscript.trim();
+    stopRec(async ()=>{
+      if(text) await analyzeTranscript(text);
+      renderStep4(); goStep(4);
+    });
+  } else {
+    renderStep4(); goStep(4);
+  }
+};
+
+// STEP4
+document.getElementById('step4Back').onclick=()=>goStep(3);
+document.getElementById('step4Clear').onclick=()=>{
+  if(confirm('注文を全部消しますか？')){
+    order=[]; renderStep4(); renderMenuGrid();
+  }
+};
+document.getElementById('step4Next').onclick=()=>{ buildTicket(); goStep(5); };
+
+// STEP5
+document.getElementById('step5Back').onclick=()=>goStep(4);
+document.getElementById('step5Again').onclick=()=>{
+  order=[]; fullTranscript='';
+  updateStep3Footer(); renderMenuGrid();
+  goStep(1);
+};
+
+/* ---------- 起動 ---------- */
+setupTables();
+setupRecog();
+loadMenu();
+</script>
+</body>
+</html>
